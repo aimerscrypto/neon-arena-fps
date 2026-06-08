@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Neon Arena – a cyberpunk survival FPS. Survive endless waves of enemies in a neon-lit arena." />
+    <title>Neon Arena FPS</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+  </head>
+  <body>
+
+    <!-- ============================================================
+         LOADING SCREEN
+    ============================================================ -->
+    <div id="loading-screen">
+      <div id="loading-logo">NEON ARENA</div>
+      <div class="loading-bar-container">
+        <div id="loading-fill"></div>
+      </div>
+      <div id="loading-prompt" class="hidden">CLICK TO START</div>
+    </div>
+
+    <!-- ============================================================
+         MOBILE NOTICE OVERLAY (shown only on mobile/touch devices)
+    ============================================================ -->
+    <div id="mobile-notice" class="hidden">
+      <div id="mobile-bg">
+        <div id="mobile-bg-grid"></div>
+        <div id="mobile-scanline"></div>
+      </div>
+      <div id="mobile-content">
+        <div id="mobile-icon">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="10" width="40" height="28" rx="3" stroke="currentColor" stroke-width="2.5" fill="none"/>
+            <path d="M8 34h40" stroke="currentColor" stroke-width="2"/>
+            <rect x="20" y="38" width="16" height="10" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M14 48h32" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="52" y="18" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <rect x="54" y="26" width="4" height="4" rx="0.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <rect x="60" y="18" width="4" height="3" rx="0.5" fill="currentColor" opacity="0.4"/>
+          </svg>
+        </div>
+        <div id="mobile-eyebrow">NEON ARENA FPS</div>
+        <h1 id="mobile-title">DESKTOP<br><span>RECOMMENDED</span></h1>
+        <p id="mobile-msg">NEON ARENA plays best on desktop with mouse and keyboard.</p>
+        <div id="mobile-buttons">
+          <button class="menu-btn primary-btn" id="play-anyway-btn">
+            <span class="btn-icon">▶</span>
+            <span class="btn-label">PLAY ANYWAY</span>
+          </button>
+          <button class="menu-btn secondary-btn" id="come-back-btn">
+            <span class="btn-icon">✕</span>
+            <span class="btn-label">COME BACK ON DESKTOP</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         HUD (Heads-Up Display) – shown during gameplay
+    ============================================================ -->
+    <div id="hud">
+
+      <!-- Boss Health Panel - top center -->
+      <div id="boss-health-panel" class="hidden">
+        <div class="boss-label">BOSS</div>
+        <div id="boss-name-label">ELITE SHOOTER</div>
+        <div class="boss-health-bar-container">
+          <div id="boss-health-bar"></div>
+        </div>
+        <div id="boss-health-text">100 / 100</div>
+      </div>
+
+      <!-- Minimap - bottom left above health -->
+      <div id="minimap-panel">
+        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+      </div>
+
+      <!-- Health Bar – bottom left -->
+      <div id="health-panel">
+        <div id="health-label">HP</div>
+        <div id="health-bar-wrap">
+          <div id="health-bar-container">
+            <div id="health-bar"></div>
+          </div>
+        </div>
+        <div id="health-val">100</div>
+      </div>
+
+      <!-- Weapon Switcher HUD -->
+      <div id="weapon-switcher" class="hidden"></div>
+
+      <!-- Ammo Counter – bottom right -->
+      <div id="ammo-panel">
+        <div id="weapon-name">RIFLE</div>
+        <div id="ammo-label">AMMO</div>
+        <div id="ammo-display">
+          <span id="ammo-current">30</span>
+          <span id="ammo-sep">/</span>
+          <span id="ammo-reserve">90</span>
+        </div>
+        <!-- Reload bar appears on reload -->
+        <div id="reload-bar-container" class="hidden">
+          <div id="reload-bar"></div>
+          <div id="reload-label">RELOADING</div>
+        </div>
+      </div>
+
+      <!-- Wave / Score – top left -->
+      <div id="wave-panel">
+        <div id="wave-display">WAVE <span id="wave-val">1</span></div>
+        <div id="enemy-counter" style="font-family: var(--font-hud); font-size: 14px; color: var(--neon-blue); opacity: 0.8; margin-top: 4px;"></div>
+        <div id="score-display">SCORE <span id="score-val">0</span></div>
+        <div id="high-score-display">BEST <span id="high-score-val">0</span></div>
+        <!-- Multiplayer FFA label — hidden in solo mode -->
+        <div id="mp-ffa-label" class="hidden">⚡ FFA</div>
+      </div>
+
+      <!-- Match timer — top center, multiplayer only -->
+      <div id="mp-match-timer" class="hidden">3:00</div>
+
+      <!-- Combo – top right -->
+      <div id="combo-panel">
+        <div id="combo-text">COMBO <span id="combo-val">x1</span></div>
+        <div id="combo-bar-bg"><div id="combo-bar"></div></div>
+      </div>
+
+      <!-- Kill Streak – top right below combo -->
+      <div id="streak-panel" class="hidden">
+        <div id="streak-text">STREAK <span id="streak-val">0</span></div>
+      </div>
+
+      <!-- Kill Feed – below combo -->
+      <div id="kill-feed"></div>
+
+      <!-- Crosshair – dead center -->
+      <div id="crosshair-container">
+        <div id="crosshair" class="crosshair-cross">
+          <span class="ch-top"></span>
+          <span class="ch-bottom"></span>
+          <span class="ch-left"></span>
+          <span class="ch-right"></span>
+          <span class="ch-dot"></span>
+        </div>
+      </div>
+
+      <!-- Hit Marker – flashes on hit -->
+      <div id="hit-marker">
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <!-- Notifications (powerup pickup etc.) -->
+      <div id="notification-text"></div>
+
+      <!-- Rampage text -->
+      <div id="rampage-text">RAMPAGE!</div>
+
+      <!-- Screen overlays -->
+      <div id="damage-overlay"></div>
+      <div id="ads-vignette"></div>
+      <div id="sniper-scope" class="hidden">
+        <div class="sniper-bar-top"></div>
+        <div class="sniper-bar-bottom"></div>
+        <div class="sniper-crosshair"></div>
+      </div>
+
+      <!-- Wave announcement -->
+      <div id="wave-announce"><span id="wave-announce-label">WAVE</span> <span id="wave-announce-num">1</span></div>
+
+      <!-- Floating text pool (for kill scores, headshots, combo milestones) -->
+      <div id="floating-text-pool">
+        <div class="floating-text" data-pool-id="0"></div>
+        <div class="floating-text" data-pool-id="1"></div>
+        <div class="floating-text" data-pool-id="2"></div>
+        <div class="floating-text" data-pool-id="3"></div>
+        <div class="floating-text" data-pool-id="4"></div>
+        <div class="floating-text" data-pool-id="5"></div>
+        <div class="floating-text" data-pool-id="6"></div>
+        <div class="floating-text" data-pool-id="7"></div>
+        <div class="floating-text" data-pool-id="8"></div>
+        <div class="floating-text" data-pool-id="9"></div>
+      </div>
+
+      <!-- HUD corner buttons -->
+      <div id="hud-corner-btns">
+        <button id="hud-settings-btn" title="Settings (ESC to pause)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button id="fullscreen-btn" title="Toggle Fullscreen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Grenade cooldown HUD — bottom center -->
+      <div id="grenade-hud">
+        <div id="grenade-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="14" r="6"/>
+            <path d="M12 8V4M10 4h4M9 11.5c0 0 1.5-2 3-2s3 2 3 2"/>
+          </svg>
+          <svg id="grenade-arc" viewBox="0 0 36 36">
+            <circle class="grenade-arc-bg" cx="18" cy="18" r="15.9155"
+              fill="none" stroke="rgba(0,243,255,0.15)" stroke-width="3"/>
+            <circle id="grenade-arc-fill" cx="18" cy="18" r="15.9155"
+              fill="none" stroke="#00f3ff" stroke-width="3"
+              stroke-dasharray="100 100" stroke-dashoffset="100"
+              stroke-linecap="round"
+              transform="rotate(-90 18 18)"/>
+          </svg>
+        </div>
+        <div id="grenade-label">G <span id="grenade-count">x3</span></div>
+        <div id="grenade-timer">READY</div>
+      </div>
+    </div><!-- /#hud -->
+
+
+    <!-- ============================================================
+         WAVE COMPLETE SCREEN
+    ============================================================ -->
+    <div id="wave-complete-screen" class="hidden">
+      <div id="wc-scanlines"></div>
+      <div id="wc-content">
+        <div id="wc-heading">
+          <div id="wc-label">WAVE</div>
+          <div id="wc-num">1</div>
+          <div id="wc-complete-text">COMPLETE</div>
+        </div>
+        <div id="wc-stats">
+          <div class="wc-stat">
+            <div class="wc-stat-label">KILLS THIS WAVE</div>
+            <div class="wc-stat-value" id="wc-kills">0</div>
+          </div>
+          <div class="wc-stat">
+            <div class="wc-stat-label">SCORE EARNED</div>
+            <div class="wc-stat-value" id="wc-score">0</div>
+          </div>
+          <div class="wc-stat">
+            <div class="wc-stat-label">COMBO</div>
+            <div class="wc-stat-value" id="wc-combo">x1</div>
+          </div>
+        </div>
+        <div id="wc-divider"></div>
+        <div id="wc-next">
+          <div id="wc-next-label">NEXT</div>
+          <div id="wc-next-wave">WAVE 2 INCOMING — 5 ENEMIES</div>
+          <div id="wc-boss-warning" class="hidden">⚠ BOSS WAVE INCOMING ⚠</div>
+        </div>
+        <div id="wc-hint">[ CLICK OR PRESS ANY KEY TO CONTINUE ]</div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         PAUSE SCREEN OVERLAY
+    ============================================================ -->
+    <div id="pause-screen" class="hidden">
+      <div id="pause-content">
+        <h1 id="pause-heading">PAUSED</h1>
+        <div id="pause-stats">
+          WAVE <span id="pause-wave-val">1</span> | SCORE <span id="pause-score-val">0</span>
+        </div>
+        <div id="pause-buttons">
+          <button class="menu-btn primary-btn" id="resume-btn" style="border-color: var(--neon-green); color: var(--neon-green);">RESUME</button>
+          <button class="menu-btn primary-btn" id="restart-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow);">RESTART</button>
+          <button class="menu-btn primary-btn" id="pause-main-menu-btn" style="border-color: var(--neon-blue); color: var(--neon-blue);">MAIN MENU</button>
+        </div>
+        <div id="pause-controls">Press ESC to resume</div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         MAIN MENU / PAUSE OVERLAY
+    ============================================================ -->
+    <div id="blocker">
+      <!-- Animated background layers -->
+      <div id="menu-bg">
+        <div id="menu-bg-glow-1"></div>
+        <div id="menu-bg-glow-2"></div>
+        <div id="menu-scanline"></div>
+      </div>
+
+      <div id="menu">
+        <!-- Title -->
+        <div id="menu-title-block">
+          <div id="menu-eyebrow">CYBERPUNK SURVIVAL FPS</div>
+          <h1 id="menu-title">
+            <span class="title-line">NEON</span>
+            <span class="title-line accent">ARENA</span>
+          </h1>
+          <div id="menu-title-underline"></div>
+          <div id="menu-subtitle">SURVIVE THE WAVES</div>
+        </div>
+
+        <div id="menu-buttons">
+          <button class="menu-btn primary-btn play-btn-large" id="play-btn">
+            <span class="btn-icon">▶</span>
+            <span class="btn-label">PLAY</span>
+            <span class="btn-shine"></span>
+          </button>
+          <button class="menu-btn primary-btn" id="leaderboard-btn">
+            <span class="btn-icon">🏆</span>
+            <span class="btn-label">LEADERBOARD</span>
+          </button>
+          <button class="menu-btn primary-btn mp-menu-btn" id="multiplayer-btn">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-label">MULTIPLAYER</span>
+            <span class="btn-shine"></span>
+          </button>
+          <div id="menu-secondary-row">
+            <button class="menu-btn accent-btn" id="controls-btn">
+              <span class="btn-icon">🎮</span>
+              <span class="btn-label">CONTROLS</span>
+            </button>
+            <button class="menu-btn accent-btn" id="how-to-play-btn">
+              <span class="btn-icon">💡</span>
+              <span class="btn-label">HOW TO PLAY</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Fullscreen notice (shown if blocked) -->
+        <div id="fullscreen-notice" class="hidden">
+          <span>⛶ Click to enter fullscreen for the best experience</span>
+          <button id="fullscreen-request-btn" class="menu-btn small-btn">Enter Fullscreen</button>
+        </div>
+
+        <button class="menu-btn secondary-btn menu-settings-small" id="settings-open-btn">
+          <span class="btn-icon">⚙</span>
+          <span class="btn-label">SETTINGS</span>
+        </button>
+      </div>
+
+      <!-- Version -->
+      <div id="menu-version">v1.0.0</div>
+    </div><!-- /#blocker -->
+
+    <!-- Leaderboard Panel -->
+    <div id="leaderboard-panel" class="hidden">
+      <button id="leaderboard-close-btn" class="lb-close">✕</button>
+      <div class="lb-header">GLOBAL RANKINGS</div>
+      <div class="lb-list"></div>
+      <div class="lb-footer"></div>
+    </div>
+
+
+    <!-- ============================================================
+         CONTROLS OVERLAY (toggled by CONTROLS button)
+    ============================================================ -->
+    <div id="controls-overlay" class="hidden">
+      <div id="controls-modal">
+        <div id="controls-modal-header">
+          <h2>CONTROLS</h2>
+          <button id="controls-close-btn">✕</button>
+        </div>
+        <div id="controls-grid">
+          <div class="ctrl-row"><kbd>W A S D</kbd><span>Move</span></div>
+          <div class="ctrl-row"><kbd>SPACE</kbd><span>Jump</span></div>
+          <div class="ctrl-row"><kbd>SHIFT</kbd><span>Sprint</span></div>
+          <div class="ctrl-row"><kbd>LMB</kbd><span>Shoot</span></div>
+          <div class="ctrl-row"><kbd>RMB</kbd><span>Aim Down Sights</span></div>
+          <div class="ctrl-row"><kbd>R</kbd><span>Reload</span></div>
+          <div class="ctrl-row"><kbd>Q / SCROLL</kbd><span>Switch Weapon</span></div>
+          <div class="ctrl-row"><kbd>1 / 2 / 3</kbd><span>Select Weapon</span></div>
+          <div class="ctrl-row"><kbd>G</kbd><span>Throw Grenade (3 charges)</span></div>
+          <div class="ctrl-row"><kbd>ESC</kbd><span>Pause / Menu</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         HOW TO PLAY OVERLAY (toggled by HOW TO PLAY button)
+    ============================================================ -->
+    <div id="how-to-play-overlay" class="hidden">
+      <div id="htp-modal">
+        <div id="htp-modal-header">
+          <h2>HOW TO PLAY</h2>
+          <button id="htp-close-btn">✕</button>
+        </div>
+        <div id="htp-tips">
+          <div class="htp-tip">
+            <span class="htp-num">01</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">BUILD YOUR COMBO</div>
+              <div class="htp-tip-desc">Kill enemies quickly to build your COMBO multiplier — each kill earns more points!</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">02</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">BOSS WAVES</div>
+              <div class="htp-tip-desc">Bosses appear every 3rd wave. Use the Sniper for headshots — they deal 1.5× damage.</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">03</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">COLLECT POWERUPS</div>
+              <div class="htp-tip-desc">Enemies drop health crates and ammo boxes. Walk over them to collect.</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">04</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">SWITCH WEAPONS</div>
+              <div class="htp-tip-desc">Use Q or Scroll Wheel to cycle between Rifle, Shotgun, and Sniper.</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">05</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">SPRINT TO DODGE</div>
+              <div class="htp-tip-desc">Hold SHIFT to sprint — use it to dodge enemy fire and reposition fast.</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">06</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">USE GRENADES</div>
+              <div class="htp-tip-desc">Press G to throw grenades for massive area damage. They recharge over time.</div>
+            </div>
+          </div>
+          <div class="htp-tip">
+            <span class="htp-num">07</span>
+            <div class="htp-tip-text">
+              <div class="htp-tip-title">PERFORMANCE TIP</div>
+              <div class="htp-tip-desc">Experiencing lag? Disable "High Quality Mode" in the Settings menu for a smoother experience.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         SETTINGS PANEL (modal overlay)
+    ============================================================ -->
+    <div id="settings-overlay" class="hidden">
+      <div id="settings-modal">
+        <div id="settings-header">
+          <h2>SETTINGS</h2>
+          <button id="settings-close-btn">✕</button>
+        </div>
+
+        <div class="settings-body">
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">CONTROLS</h3>
+
+            <div class="setting-row">
+              <label class="setting-label" for="sensitivity-slider">Mouse Sensitivity</label>
+              <div class="slider-wrap">
+                <input type="range" id="sensitivity-slider" min="0.1" max="3.0" step="0.05" value="1.0">
+                <span class="slider-val" id="sensitivity-val">1.00</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">ADS Mode</label>
+              <div class="btn-group">
+                <button class="toggle-btn active" id="ads-hold-btn" data-value="hold">Hold</button>
+                <button class="toggle-btn" id="ads-toggle-btn" data-value="toggle">Toggle</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">AUDIO</h3>
+
+            <div class="setting-row">
+              <label class="setting-label" for="volume-slider">Master Volume</label>
+              <div class="slider-wrap">
+                <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1.0">
+                <span class="slider-val" id="volume-val">100%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">CROSSHAIR</h3>
+
+            <div class="setting-row">
+              <label class="setting-label">Style</label>
+              <div class="btn-group">
+                <button class="toggle-btn active" id="ch-cross-btn" data-crosshair="cross">Cross</button>
+                <button class="toggle-btn" id="ch-dot-btn" data-crosshair="dot">Dot</button>
+                <button class="toggle-btn" id="ch-circle-btn" data-crosshair="circle">Circle</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3 class="settings-section-title">DISPLAY</h3>
+
+            <div class="setting-row">
+              <div>
+                <label class="setting-label" for="bloom-checkbox" style="display: block;">High Quality Mode</label>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; letter-spacing: 0.5px;">May reduce FPS on low-end devices</div>
+              </div>
+              <div class="checkbox-wrap">
+                <input type="checkbox" id="bloom-checkbox">
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label class="setting-label">Fullscreen</label>
+              <button class="menu-btn small-btn" id="fullscreen-toggle-btn">
+                <span class="btn-label">Toggle Fullscreen</span>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /.settings-body -->
+      </div><!-- /#settings-modal -->
+    </div><!-- /#settings-overlay -->
+
+
+    <!-- ============================================================
+         DEATH SCREEN
+    ============================================================ -->
+    <div id="death-screen">
+      <div id="death-scanlines"></div>
+      <div id="death-content">
+        <div id="death-title-container">
+          <h1 id="death-title">GAME OVER</h1>
+          <div id="death-glitch" aria-hidden="true">GAME OVER</div>
+        </div>
+        <div id="death-stats">
+          <div class="death-stat">
+            <div class="death-stat-label">FINAL SCORE</div>
+            <div class="death-stat-value" id="final-score">0</div>
+          </div>
+          <div class="death-stat-divider"></div>
+          <div class="death-stat">
+            <div class="death-stat-label">WAVE REACHED</div>
+            <div class="death-stat-value" id="death-wave-val">1</div>
+          </div>
+          <div class="death-stat-divider"></div>
+          <div class="death-stat">
+            <div class="death-stat-label">ENEMIES KILLED</div>
+            <div class="death-stat-value" id="death-kills-val">0</div>
+          </div>
+          <div class="death-stat-divider"></div>
+          <div class="death-stat">
+            <div class="death-stat-label">HIGH SCORE</div>
+            <div class="death-stat-value highlight" id="final-high-score">0</div>
+          </div>
+        </div>
+        <div id="new-best-label">✦ NEW BEST ✦</div>
+        <div id="death-buttons">
+          <button id="play-again-btn" class="death-action-btn death-btn-green">
+            <span>▶</span> PLAY AGAIN
+          </button>
+          <button id="death-leaderboard-btn" class="death-action-btn death-btn-blue">
+            <span>🏆</span> VIEW RANKINGS
+          </button>
+          <button id="main-menu-btn" class="death-action-btn death-btn-blue">
+            <span>⌂</span> MAIN MENU
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         WEAPON UPGRADE SCREEN
+    ============================================================ -->
+    <div id="upgrade-screen" class="hidden">
+      <div id="upgrade-scanlines"></div>
+      <div id="upgrade-content">
+        <div id="upgrade-heading">
+          <div id="upgrade-eyebrow">WAVE MILESTONE</div>
+          <div id="upgrade-title">WEAPON UPGRADE</div>
+          <div id="upgrade-weapon-label">Upgrading: <span id="upgrade-weapon-name">RIFLE</span></div>
+        </div>
+        <div id="upgrade-cards">
+          <div class="upgrade-card" id="upgrade-card-0">
+            <div class="upgrade-card-icon">⚡</div>
+            <div class="upgrade-card-name" id="upgrade-name-0">-</div>
+            <div class="upgrade-card-desc" id="upgrade-desc-0">-</div>
+          </div>
+          <div class="upgrade-card" id="upgrade-card-1">
+            <div class="upgrade-card-icon">⚡</div>
+            <div class="upgrade-card-name" id="upgrade-name-1">-</div>
+            <div class="upgrade-card-desc" id="upgrade-desc-1">-</div>
+          </div>
+          <div class="upgrade-card" id="upgrade-card-2">
+            <div class="upgrade-card-icon">⚡</div>
+            <div class="upgrade-card-name" id="upgrade-name-2">-</div>
+            <div class="upgrade-card-desc" id="upgrade-desc-2">-</div>
+          </div>
+        </div>
+        <div id="upgrade-hint">[ SELECT AN UPGRADE TO CONTINUE ]</div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         MULTIPLAYER SCOREBOARD OVERLAY (Tab to toggle)
+    ============================================================ -->
+    <div id="mp-scoreboard" class="hidden">
+      <div id="mp-scoreboard-inner">
+        <div id="mp-scoreboard-title">⚡ FREE FOR ALL — SCOREBOARD</div>
+        <div id="mp-scoreboard-hint">[ TAB ] TO CLOSE</div>
+        <div id="mp-scoreboard-list"></div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         MATCHMAKING SCREEN
+    ============================================================ -->
+    <div id="matchmaking-screen" class="hidden">
+      <div id="mm-bg">
+        <div id="mm-bg-grid"></div>
+        <div id="mm-scanline"></div>
+      </div>
+      <div id="mm-content">
+        <div id="mm-logo">NEON ARENA</div>
+        <div id="mm-title">⚡ MULTIPLAYER</div>
+
+        <div id="mm-status">
+          <div id="mm-finding" class="mm-pulse">FINDING MATCH...</div>
+          <div id="mm-player-count">PLAYERS FOUND: <span id="mm-count-val">0</span> / 10</div>
+        </div>
+
+        <div id="mm-countdown-wrap" class="hidden">
+          <div id="mm-countdown-label">STARTING IN</div>
+          <div id="mm-countdown-val">30</div>
+        </div>
+
+        <div id="mm-choice" class="hidden">
+          <div id="mm-choice-host">
+            <div id="mm-choice-label">CHOOSE HOW TO START:</div>
+            <button class="mm-action-btn mm-btn-green" id="mm-fill-bots-btn">
+              <span class="btn-icon">⚡</span>
+              FILL WITH BOTS &amp; START
+            </button>
+            <button class="mm-action-btn mm-btn-blue" id="mm-start-now-btn">
+              <span class="btn-icon">⏳</span>
+              START NOW WITH CURRENT PLAYERS
+            </button>
+          </div>
+          <div id="mm-choice-nonhost" class="hidden">
+            <div id="mm-waiting-label">WAITING FOR HOST TO START...</div>
+          </div>
+        </div>
+
+        <div id="mm-offline-msg" class="hidden">
+          <div id="mm-offline-icon">⚠</div>
+          <div id="mm-offline-text">SERVER OFFLINE</div>
+          <div id="mm-offline-sub">Multiplayer is unavailable. Play Solo instead.</div>
+        </div>
+
+        <button class="mm-cancel-btn" id="mm-cancel-btn">✕ CANCEL</button>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         MATCH RESULTS SCREEN
+    ============================================================ -->
+    <div id="match-results-screen" class="hidden">
+      <div id="mr-scanlines"></div>
+      <div id="mr-content">
+        <div id="mr-title">MATCH OVER</div>
+        <div id="mr-winner-wrap">
+          <div id="mr-winner-label">🏆 WINNER</div>
+          <div id="mr-winner-name">—</div>
+          <div id="mr-winner-score">0 KILLS</div>
+        </div>
+        <div id="mr-scoreboard">
+          <div id="mr-scoreboard-header">
+            <span>PLAYER</span>
+            <span>KILLS</span>
+          </div>
+          <div id="mr-scoreboard-list"></div>
+        </div>
+        <div id="mr-buttons">
+          <button class="death-action-btn death-btn-green" id="mp-play-again-btn">
+            <span>⚡</span> PLAY AGAIN
+          </button>
+          <button class="death-action-btn death-btn-blue" id="mp-main-menu-btn">
+            <span>⌂</span> MAIN MENU
+          </button>
+        </div>
+        <div id="mr-auto-close">Returning to menu in <span id="mr-auto-close-val">15</span>s...</div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
