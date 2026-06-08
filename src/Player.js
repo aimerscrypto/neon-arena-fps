@@ -829,7 +829,7 @@ export class Player {
     }
 
     // Solo death flow
-    window.CrazyGames?.SDK?.game?.gameplayStop();
+    try { window.CrazyGames?.SDK?.game?.gameplayStop(); } catch(e){}
     this.controls.unlock();
     // Pass wave and total kills from botManager if available
     const wave  = this.botManager ? this.botManager.wave       : undefined;

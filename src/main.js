@@ -388,20 +388,18 @@ function initSubtitleCycling() {
 // ─────────────────────────────────────────────────────────────────
 async function startGame() {
   audioManager.resume();
-  window.CrazyGames?.SDK?.game?.gameplayStart();
+  try { window.CrazyGames?.SDK?.game?.gameplayStart(); } catch(e){}
   hasGameStarted = true;
+
+  // Lock pointer immediately to preserve user gesture
+  player.controls.lock();
 
   // Try to enter fullscreen; if denied, show notice and continue
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-    try {
-      await settingsManager.requestFullscreen();
-    } catch {
+    settingsManager.requestFullscreen().catch(() => {
       document.getElementById('fullscreen-notice')?.classList.remove('hidden');
-    }
+    });
   }
-
-  // Lock pointer (works whether or not fullscreen succeeded)
-  player.controls.lock();
 }
 
 function restartGame() {
@@ -410,7 +408,7 @@ function restartGame() {
     endMultiplayerMatch();
   }
   ui.hideDeathScreen();
-  window.CrazyGames?.SDK?.game?.gameplayStart();
+  try { window.CrazyGames?.SDK?.game?.gameplayStart(); } catch(e){}
   hasGameStarted = true;
   player.reset();
   botManager.reset();
@@ -575,12 +573,7 @@ async function startMultiplayerMatch(data) {
 
   // Notify CrazyGames
   audioManager.resume();
-  window.CrazyGames?.SDK?.game?.gameplayStart();
-
-  // Attempt fullscreen
-  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-    try { await settingsManager.requestFullscreen(); } catch { /* ignore */ }
-  }
+  try { window.CrazyGames?.SDK?.game?.gameplayStart(); } catch(e){}
 
   // Start multiplayer session (spawns remote meshes, wires callbacks)
   multiplayerManager.start(data);
@@ -592,8 +585,13 @@ async function startMultiplayerMatch(data) {
     projectileManager.multiplayerManager = multiplayerManager;
   }
 
-  // Lock pointer to begin game
+  // Lock pointer synchronously to preserve user gesture
   player.controls.lock();
+
+  // Attempt fullscreen
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    settingsManager.requestFullscreen().catch(() => {});
+  }
 }
 
 /** Clean up after match ends or player leaves. */
@@ -621,7 +619,7 @@ function endMultiplayerMatch() {
 
   multiplayerManager.cleanup();
   networkManager.disconnect();
-  window.CrazyGames?.SDK?.game?.gameplayStop();
+  try { window.CrazyGames?.SDK?.game?.gameplayStop(); } catch(e){}
   // NOTE: player.reset() is called by results screen callbacks, not here
 }
 
