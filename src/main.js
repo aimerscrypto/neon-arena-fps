@@ -97,7 +97,11 @@ function init() {
   settingsManager.onAdsModeChange     = (v) => { if (player) player.adsMode = v; };
   settingsManager.apply(player, audioManager);
 
-  window.CrazyGames?.SDK?.init();
+  try {
+    window.CrazyGames?.SDK?.init();
+  } catch (e) {
+    console.warn('CrazyGames SDK init failed:', e);
+  }
   ui.initData();
 
   // ── Multiplayer init ─────────────────────────────────────────────────────────
