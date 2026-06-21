@@ -919,7 +919,8 @@ export class Player {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  /** Returns true if the move from startPos→endPos hits a vertical wall. */
+  /** Returns true if the move from startPos→endPos hits a vertical wall.
+   *  Casts THREE rays (feet / mid / chest) so blocks at any height are caught. */
   _checkWall(startPos, endPos) {
     this._wallDelta.subVectors(endPos, startPos);
     const lenSq = this._wallDelta.lengthSq();
@@ -928,16 +929,19 @@ export class Player {
     const dist = Math.sqrt(lenSq);
     this._wallDelta.divideScalar(dist);
 
-    this._wallOrigin.copy(startPos);
-    this._wallOrigin.y -= 0.5;
+    const offsets = [-0.8, -0.5, 0.2]; // feet, mid, chest
+    for (let o = 0; o < offsets.length; o++) {
+      this._wallOrigin.copy(startPos);
+      this._wallOrigin.y += offsets[o];
 
-    this.raycaster.set(this._wallOrigin, this._wallDelta);
-    const hits = this.raycaster.intersectObjects(this.sceneManager.collidableMeshes, false);
+      this.raycaster.set(this._wallOrigin, this._wallDelta);
+      const hits = this.raycaster.intersectObjects(this.sceneManager.collidableMeshes, false);
 
-    for (let i = 0; i < hits.length; i++) {
-      if (hits[i].distance < dist + 1.1 &&
-          hits[i].face && Math.abs(hits[i].face.normal.y) < 0.7) {
-        return true;
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].distance < dist + 0.6 &&
+            hits[i].face && Math.abs(hits[i].face.normal.y) < 0.7) {
+          return true;
+        }
       }
     }
     return false;

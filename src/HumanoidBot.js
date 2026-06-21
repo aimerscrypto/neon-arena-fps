@@ -407,7 +407,11 @@ export class HumanoidBot {
     for (let i = 0; i < this.botManager.player.sceneManager.collidableBoxes.length; i++) {
       const box = this.botManager.player.sceneManager.collidableBoxes[i];
       if (box.max.y > pos.y + 0.05 && box.min.y < pos.y + 3.0 * this.stats.size && this._botBox.intersectsBox(box)) {
-        pos.x = oldX;
+        // Push bot away from box center instead of just restoring old position
+        const boxCenterX = (box.min.x + box.max.x) * 0.5;
+        const pushDir = pos.x - boxCenterX;
+        const minPush = r + 0.6;
+        pos.x = boxCenterX + (pushDir >= 0 ? minPush : -minPush);
         collidedX = true;
         break;
       }
@@ -422,7 +426,11 @@ export class HumanoidBot {
     for (let i = 0; i < this.botManager.player.sceneManager.collidableBoxes.length; i++) {
       const box = this.botManager.player.sceneManager.collidableBoxes[i];
       if (box.max.y > pos.y + 0.05 && box.min.y < pos.y + 3.0 * this.stats.size && this._botBox.intersectsBox(box)) {
-        pos.z = oldZ;
+        // Push bot away from box center instead of just restoring old position
+        const boxCenterZ = (box.min.z + box.max.z) * 0.5;
+        const pushDir = pos.z - boxCenterZ;
+        const minPush = r + 0.6;
+        pos.z = boxCenterZ + (pushDir >= 0 ? minPush : -minPush);
         collidedZ = true;
         break;
       }
