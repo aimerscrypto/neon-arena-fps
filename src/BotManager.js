@@ -401,18 +401,20 @@ export class BotManager {
             }
           };
 
-          if (completedWave % 3 === 0 && window.CrazyGames?.SDK?.ad) {
+          if (completedWave % 3 === 0 && window.CrazyGames?.SDK?.ad && typeof window.CrazyGames.SDK.ad.requestAd === 'function') {
             let adHandled = false;
-            let timeoutId = setTimeout(() => {
-              if (!adHandled) safeRunNext();
-            }, 3000); // Fallback if SDK hangs
+            let timeoutId;
 
             const safeRunNext = () => {
               if (adHandled) return;
               adHandled = true;
-              clearTimeout(timeoutId);
+              if (timeoutId) clearTimeout(timeoutId);
               runNext();
             };
+
+            timeoutId = setTimeout(() => {
+              if (!adHandled) safeRunNext();
+            }, 3000); // Fallback if SDK hangs
 
             try {
               window.CrazyGames.SDK.ad.requestAd('midgame', {
