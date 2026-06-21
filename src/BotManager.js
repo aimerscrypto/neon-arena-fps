@@ -405,7 +405,7 @@ export class BotManager {
             let adHandled = false;
             let timeoutId = setTimeout(() => {
               if (!adHandled) safeRunNext();
-            }, 1000); // Fallback if SDK hangs
+            }, 3000); // Fallback if SDK hangs
 
             const safeRunNext = () => {
               if (adHandled) return;
@@ -423,7 +423,7 @@ export class BotManager {
                     safeRunNext();
                   },
                   adStarted: () => {
-                    clearTimeout(timeoutId); // Ad started properly, wait for finish
+                    // Ad started properly
                   }
                 }
               });
