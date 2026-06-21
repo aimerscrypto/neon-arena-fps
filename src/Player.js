@@ -127,6 +127,9 @@ export class Player {
     ];
     this.currentWeaponIndex = 0;
 
+    // Deep-copy of original weapon stats for reset()
+    this._weaponDefaults = this.weapons.map(w => Object.assign({}, w));
+
     // Initialise ammo/stats from weapon 0
     const startW        = this.weapons[0];
     this.magSize        = startW.magSize;
@@ -208,10 +211,12 @@ export class Player {
     this._ceilRay.far    = 2;
     this._wallFrontRay   = new THREE.Raycaster();
     this._wallFrontRay.far = 1.2;
-    this._wallDelta      = new THREE.Vector3();
-    this._wallOrigin     = new THREE.Vector3();
     this._oldPos         = new THREE.Vector3();
-    this._posAfterX      = new THREE.Vector3();
+    // Cached Box3 for AABB player hull (used in depenetration)
+    this._playerBox      = new THREE.Box3();
+    this._obsBox         = new THREE.Box3();
+    // Cached raycaster for grenade env collision
+    this._grenadeRay     = new THREE.Raycaster();
     this._muzzleWP       = new THREE.Vector3();
     this._rayDir         = new THREE.Vector3();
     this._rayEnd         = new THREE.Vector3();
@@ -710,13 +715,34 @@ export class Player {
 
       // Physics
       g.vel.y += gravity * delta;
+
+      // ── Continuous collision: raycast before moving ──
+      const moveDist = g.vel.length() * delta;
+      if (moveDist > 0 && this.sceneManager.collidableMeshes.length > 0) {
+        const moveDir = g.vel.clone().normalize();
+        this._grenadeRay.set(g.mesh.position, moveDir);
+        this._grenadeRay.far = moveDist;
+        const envHits = this._grenadeRay.intersectObjects(this.sceneManager.collidableMeshes, false);
+        if (envHits.length > 0 && envHits[0].distance <= moveDist) {
+          g.mesh.position.copy(envHits[0].point);
+          this._explodeGrenade(g);
+          continue;
+        }
+      }
+
       g.mesh.position.addScaledVector(g.vel, delta);
       g.mesh.rotation.x += delta * 8;
       g.mesh.rotation.z += delta * 5;
 
       g.timer += delta;
-      if (g.timer >= 2.5 || g.mesh.position.y < 0.5) {
-        if (g.mesh.position.y < 0.5) g.mesh.position.y = 0.5;
+      // Timer-based detonation (unchanged)
+      if (g.timer >= 2.5) {
+        this._explodeGrenade(g);
+        continue;
+      }
+      // Floor fallback
+      if (g.mesh.position.y < 0.5) {
+        g.mesh.position.y = 0.5;
         this._explodeGrenade(g);
       }
     }
@@ -741,7 +767,7 @@ export class Player {
 
     // Damage all bots in radius
     if (this.botManager) {
-      const RADIUS = 8;
+      const RADIUS = 8 * (this._grenadeRadiusMult || 1.0);
       const bots = this.botManager.bots;
       let killCount = 0;
       for (let i = 0; i < bots.length; i++) {
@@ -754,10 +780,14 @@ export class Player {
           const damage = 300 * falloff; // Doubled grenade damage
           const wasAlive = bot.health > 0;
           bot.takeDamage(damage);
-          if (bot.health > 0) {
-            this.ui.showDamageNumber(bot.mesh.position.clone(), Math.round(damage), this.camera, this.renderer, '#ff8800', 20);
-          } else if (wasAlive) {
+          if (bot.health <= 0 && wasAlive) {
             killCount++;
+            // Scavenger: 40% chance to drop health on grenade kill
+            if (this._scavengerActive && this.powerupManager && Math.random() < 0.4) {
+              this.powerupManager.spawnEnemyDropAt(bot.mesh.position.clone(), 'HEALTH');
+            }
+          } else if (bot.health > 0) {
+            this.ui.showDamageNumber(bot.mesh.position.clone(), Math.round(damage), this.camera, this.renderer, '#ff8800', 20);
           }
         }
       }
@@ -770,13 +800,54 @@ export class Player {
   // ─────────────────────────────────────────────────────────────────
   applyUpgrade(upgradeId) {
     switch (upgradeId) {
-      case 'MAX_HEALTH':
-        this.maxHealth = Math.ceil(this.maxHealth * 1.5);
+      case 'MAX_HEALTH': {
+        this.maxHealth += 40;
         this.health = this.maxHealth;
         this.ui.updateHealth(this.health, this.maxHealth);
-        this.ui.showNotification('MAX HEALTH ↑ +50%', '#ffcc00');
+        this.ui.showNotification('Steel Core: +40 MAX HP', '#ffcc00');
         break;
-      case 'EXTENDED_MAG':
+      }
+      case 'NANO_REGEN': {
+        this._regenDelay *= 0.6;
+        this.ui.showNotification('Nano Regen: Regen faster!', '#00ff88');
+        break;
+      }
+      case 'GHOST_STEP': {
+        this.baseSpeed *= 1.2;
+        this.speed = this.baseSpeed;
+        this.ui.showNotification('Ghost Step: Speed +20%', '#00f3ff');
+        break;
+      }
+      case 'IRON_SKIN': {
+        if (this._damageMult === undefined) this._damageMult = 1.0;
+        this._damageMult *= 0.85;
+        this.ui.showNotification('Iron Skin: -15% Damage taken', '#aaaaff');
+        break;
+      }
+      case 'OVERCHARGE': {
+        for (let i = 0; i < this.weapons.length; i++) {
+          this.weapons[i].damage = Math.ceil(this.weapons[i].damage * 1.25);
+        }
+        this.ui.showNotification('Overcharge: Damage +25%', '#ff4400');
+        break;
+      }
+      case 'HAIR_TRIGGER': {
+        for (let i = 0; i < this.weapons.length; i++) {
+          this.weapons[i].shootDelay *= 0.8;
+        }
+        this.shootDelay = this.weapons[this.currentWeaponIndex].shootDelay;
+        this.ui.showNotification('Hair Trigger: Fire Rate +20%', '#ffcc00');
+        break;
+      }
+      case 'SPEED_LOADER': {
+        for (let i = 0; i < this.weapons.length; i++) {
+          this.weapons[i].reloadDuration *= 0.7;
+        }
+        this.reloadDuration = this.weapons[this.currentWeaponIndex].reloadDuration;
+        this.ui.showNotification('Speed Loader: Reload -30%', '#00ff88');
+        break;
+      }
+      case 'EXTENDED_MAG': {
         for (let i = 0; i < this.weapons.length; i++) {
           this.weapons[i].magSize    = Math.ceil(this.weapons[i].magSize    * 1.5);
           this.weapons[i].maxReserve = Math.ceil(this.weapons[i].maxReserve * 1.5);
@@ -787,19 +858,39 @@ export class Player {
         // Refill current ammo to new mag size
         this.ammo = this.magSize;
         this.ui.updateAmmo(this.ammo, this.reserveAmmo);
-        this.ui.showNotification('ALL GUN MAGS ↑ +50%', '#ffcc00');
+        this.ui.showNotification('Extended Mag: Mag +50%', '#ffcc00');
         break;
-      case 'DAMAGE_BOOST':
-        for (let i = 0; i < this.weapons.length; i++) {
-          this.weapons[i].damage = Math.ceil(this.weapons[i].damage * 1.5);
-        }
-        this.ui.showNotification('ALL GUN DAMAGE ↑ +50%', '#ffcc00');
+      }
+      case 'GRENADE_BELT': {
+        if (this._maxGrenades === undefined) this._maxGrenades = 3;
+        this._maxGrenades += 2;
+        this.grenadeCount += 2;
+        this.ui.updateGrenadeCount(this.grenadeCount);
+        this.ui.showNotification('Grenade Belt: +2 Grenades', '#ff8800');
         break;
+      }
+      case 'BLAST_RADIUS': {
+        if (this._grenadeRadiusMult === undefined) this._grenadeRadiusMult = 1.0;
+        this._grenadeRadiusMult *= 1.3;
+        this.ui.showNotification('Blast Radius: AoE +30%', '#ff4400');
+        break;
+      }
+      case 'SCAVENGER': {
+        this._scavengerActive = true;
+        this.ui.showNotification('Scavenger: Health drops on kills!', '#00ff88');
+        break;
+      }
+      case 'ADRENALINE': {
+        this._adrenalineActive = true;
+        this.ui.showNotification('Adrenaline: Kill triggers slow-mo!', '#00f3ff');
+        break;
+      }
     }
   }
 
   // ─────────────────────────────────────────────────────────────────
   takeDamage(amount) {
+    if (this._damageMult) amount = Math.round(amount * this._damageMult);
     this.health -= amount;
     // Stop regen on any damage
     this._regenTimer     = 0;
@@ -859,21 +950,47 @@ export class Player {
 
   reset() {
     this.isDead = false;
-    this.weapons.forEach(w => {
-      w.ammo = w.magSize;
-      w.reserveAmmo = w.maxReserve;
-      w.isReloading = false;
-      w.reloadTimer = 0;
-      w.autoReloadTimer = 0;
-    });
+
+    // ── Restore weapon stats to originals ──
+    for (let i = 0; i < this.weapons.length; i++) {
+      const def = this._weaponDefaults[i];
+      this.weapons[i].damage         = def.damage;
+      this.weapons[i].magSize        = def.magSize;
+      this.weapons[i].maxReserve     = def.maxReserve;
+      this.weapons[i].shootDelay     = def.shootDelay;
+      this.weapons[i].reloadDuration = def.reloadDuration;
+      this.weapons[i].ammo           = def.magSize;
+      this.weapons[i].reserveAmmo    = def.maxReserve;
+      this.weapons[i].isReloading    = false;
+      this.weapons[i].reloadTimer    = 0;
+      this.weapons[i].autoReloadTimer = 0;
+    }
+
     this.maxHealth       = 100;
     this.health          = this.maxHealth;
     this.speedTimer      = 0;
     this.rapidFireTimer  = 0;
     this.shieldCharges   = 0;
+    this.baseSpeed       = 250.0;
     this.speed           = this.baseSpeed;
-    this.ammo            = this.magSize;
-    this.reserveAmmo     = this.weapons[this.currentWeaponIndex].maxReserve;
+
+    // ── Upgrade field resets ──
+    this._damageMult        = 1.0;
+    this._grenadeRadiusMult = 1.0;
+    this._scavengerActive   = false;
+    this._adrenalineActive  = false;
+    this._regenDelay        = 8.0;
+    this._maxGrenades       = 3;
+
+    // Sync active weapon stats
+    const curW = this.weapons[this.currentWeaponIndex];
+    this.magSize        = curW.magSize;
+    this.maxReserve     = curW.maxReserve;
+    this.shootDelay     = curW.shootDelay;
+    this.reloadDuration = curW.reloadDuration;
+    this.ammo           = curW.ammo;
+    this.reserveAmmo    = curW.reserveAmmo;
+
     this.isReloading     = false;
     this.isShooting      = false;
     this.isADS           = false;
@@ -919,32 +1036,67 @@ export class Player {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  /** Returns true if the move from startPos→endPos hits a vertical wall.
-   *  Casts THREE rays (feet / mid / chest) so blocks at any height are caught. */
-  _checkWall(startPos, endPos) {
-    this._wallDelta.subVectors(endPos, startPos);
-    const lenSq = this._wallDelta.lengthSq();
-    if (lenSq === 0) return false;
+  /**
+   * AABB depenetration — pushes the player out of any overlapping collidable
+   * box. Run up to maxIter times to handle corner cases.
+   * Zeroes the matching velocity component when a push occurs.
+   */
+  _depenetratePlayer(maxIter = 3) {
+    const pos = this.camera.position;
+    const HX = 0.4, HY = 0.9, HZ = 0.4; // player half-extents
+    const boxes = this.sceneManager.collidableBoxes;
 
-    const dist = Math.sqrt(lenSq);
-    this._wallDelta.divideScalar(dist);
+    for (let iter = 0; iter < maxIter; iter++) {
+      let pushed = false;
 
-    const offsets = [-0.8, -0.5, 0.2]; // feet, mid, chest
-    for (let o = 0; o < offsets.length; o++) {
-      this._wallOrigin.copy(startPos);
-      this._wallOrigin.y += offsets[o];
+      // Rebuild player box each iteration (position changes)
+      this._playerBox.set(
+        new THREE.Vector3(pos.x - HX, pos.y - HY, pos.z - HZ),
+        new THREE.Vector3(pos.x + HX, pos.y + HY, pos.z + HZ)
+      );
 
-      this.raycaster.set(this._wallOrigin, this._wallDelta);
-      const hits = this.raycaster.intersectObjects(this.sceneManager.collidableMeshes, false);
+      for (let b = 0; b < boxes.length; b++) {
+        const box = boxes[b];
+        if (!this._playerBox.intersectsBox(box)) continue;
 
-      for (let i = 0; i < hits.length; i++) {
-        if (hits[i].distance < dist + 0.6 &&
-            hits[i].face && Math.abs(hits[i].face.normal.y) < 0.7) {
-          return true;
+        // Overlap on each axis
+        const ox = Math.min(this._playerBox.max.x, box.max.x) - Math.max(this._playerBox.min.x, box.min.x);
+        const oy = Math.min(this._playerBox.max.y, box.max.y) - Math.max(this._playerBox.min.y, box.min.y);
+        const oz = Math.min(this._playerBox.max.z, box.max.z) - Math.max(this._playerBox.min.z, box.min.z);
+
+        // Resolve on smallest overlap axis
+        if (ox <= oy && ox <= oz) {
+          // Push on X
+          const sign = pos.x < (box.min.x + box.max.x) * 0.5 ? -1 : 1;
+          pos.x += sign * ox;
+          this.velocity.x = 0;
+        } else if (oz <= ox && oz <= oy) {
+          // Push on Z
+          const sign = pos.z < (box.min.z + box.max.z) * 0.5 ? -1 : 1;
+          pos.z += sign * oz;
+          this.velocity.z = 0;
+        } else {
+          // Push on Y
+          const sign = pos.y < (box.min.y + box.max.y) * 0.5 ? -1 : 1;
+          if (sign > 0) {
+            // Pushed upward — only zero y velocity if moving down into floor
+            pos.y += oy;
+          } else {
+            pos.y -= oy;
+            if (this.velocity.y > 0) this.velocity.y = 0;
+          }
         }
+
+        pushed = true;
+        // Rebuild player box after push before checking next box
+        this._playerBox.set(
+          new THREE.Vector3(pos.x - HX, pos.y - HY, pos.z - HZ),
+          new THREE.Vector3(pos.x + HX, pos.y + HY, pos.z + HZ)
+        );
       }
+
+      if (!pushed) break; // No overlaps this iteration — done early
     }
-    return false;
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -1140,23 +1292,10 @@ export class Player {
     if (this.moveLeft     || this.moveRight)
       this.velocity.x -= this.direction.x * this.speed * speedMult * sprintMult * delta;
 
-    // Snapshot position before X move
-    this._oldPos.copy(this.camera.position);
-
-    // ── Move X ──
+    // ── Move X then Z, then AABB-depenetrate ──
     this.controls.moveRight(-this.velocity.x * delta);
-    if (this._checkWall(this._oldPos, this.camera.position)) {
-      this.camera.position.copy(this._oldPos);
-      this.velocity.x = 0;
-    }
-
-    // ── Move Z ──
-    this._posAfterX.copy(this.camera.position);
     this.controls.moveForward(-this.velocity.z * delta);
-    if (this._checkWall(this._posAfterX, this.camera.position)) {
-      this.camera.position.copy(this._posAfterX);
-      this.velocity.z = 0;
-    }
+    this._depenetratePlayer(3);
 
     // ── Boundary clamp ──
     const pos = this.camera.position;

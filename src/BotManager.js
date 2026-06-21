@@ -218,6 +218,13 @@ export class BotManager {
       }
     }
 
+    // Adrenaline: each kill triggers brief slow-mo
+    if (this.player._adrenalineActive && this.triggerSlowMo) this.triggerSlowMo();
+    // Scavenger: 40% chance to drop a mini health pickup on kill
+    if (this.player._scavengerActive && this.powerupManager && Math.random() < 0.4) {
+      this.powerupManager.spawnEnemyDropAt(bot.mesh.position.clone(), 'HEALTH');
+    }
+
     // Combo
     this.combo++;
     this.comboTimer = this.maxComboTimer;
@@ -441,26 +448,30 @@ export class BotManager {
   // ── Upgrade helpers ──────────────────────────────────────────────
 
   _buildUpgradeChoices() {
-    return [
-      {
-        id: 'MAX_HEALTH',
-        name: 'MAX HEALTH',
-        desc: 'Increase maximum health by 50%.',
-        icon: '❤️',
-      },
-      {
-        id: 'EXTENDED_MAG',
-        name: 'EXTENDED MAG',
-        desc: 'Increase magazine size by 50% for all weapons.',
-        icon: '📦',
-      },
-      {
-        id: 'DAMAGE_BOOST',
-        name: 'DAMAGE BOOST',
-        desc: 'Increase damage by 50% for all weapons.',
-        icon: '🔥',
-      }
+    const POOL = [
+      { id: 'MAX_HEALTH',   name: 'Steel Core',    icon: '❤️',  desc: '+40 max HP. Heal to new max.' },
+      { id: 'NANO_REGEN',   name: 'Nano Regen',    icon: '💉',  desc: 'Regen starts 40% faster.' },
+      { id: 'GHOST_STEP',   name: 'Ghost Step',    icon: '👟',  desc: 'Move speed +20%.' },
+      { id: 'IRON_SKIN',    name: 'Iron Skin',     icon: '🛡️',  desc: 'Take 15% less damage.' },
+      { id: 'OVERCHARGE',   name: 'Overcharge',    icon: '🔥',  desc: 'All weapon damage +25%.' },
+      { id: 'HAIR_TRIGGER', name: 'Hair Trigger',  icon: '⚡',  desc: 'Fire rate +20% all weapons.' },
+      { id: 'SPEED_LOADER', name: 'Speed Loader',  icon: '🔄',  desc: 'Reload 30% faster all weapons.' },
+      { id: 'EXTENDED_MAG', name: 'Extended Mag',  icon: '📦',  desc: 'Mag size +50% all weapons.' },
+      { id: 'GRENADE_BELT', name: 'Grenade Belt',  icon: '💣',  desc: '+2 max grenades. Refill now.' },
+      { id: 'BLAST_RADIUS', name: 'Blast Radius',  icon: '💥',  desc: 'Grenade AoE radius +30%.' },
+      { id: 'SCAVENGER',    name: 'Scavenger',     icon: '🧲',  desc: 'Kills have 40% chance to drop mini health.' },
+      { id: 'ADRENALINE',   name: 'Adrenaline',    icon: '🌀',  desc: 'Each kill triggers brief slow-mo.' },
     ];
+
+    // Fisher-Yates partial shuffle — pick 3 unique entries
+    const pool = POOL.slice();
+    const picks = [];
+    for (let i = 0; i < 3; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+      picks.push(pool[i]);
+    }
+    return picks;
   }
 }
 
