@@ -681,3 +681,10 @@ function animate() {
     composer.render();
   }
 }
+
+// ── CrazyGames SDK – load only when running on CrazyGames ────────────────────
+if (window.location.hostname.includes('crazygames.com')) {
+  const s = document.createElement('script');
+  s.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+  document.head.appendChild(s);
+}
